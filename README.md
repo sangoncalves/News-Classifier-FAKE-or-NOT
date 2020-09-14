@@ -1,1 +1,1 @@
-# News-Classifier-FAKE-or-NOT-
+# News Classifier (FAKE or NOT)
