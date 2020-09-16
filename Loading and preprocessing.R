@@ -37,4 +37,12 @@ dataPreprocessing <- function(df) {
 }
 preprocessed_train_data <- dataPreprocessing(train)
 
+## 75% of the sample size
+smp_size <- floor(0.75 * nrow(preprocessed_train_data))
 
+## set the seed to make your partition reproducible
+set.seed(123)
+train_index <- sample(seq_len(nrow(preprocessed_train_data)), size = smp_size)
+
+train <- preprocessed_train_data[train_index, ]
+verification <- preprocessed_train_data[-train_index, ]
