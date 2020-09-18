@@ -20,22 +20,24 @@ dataPreprocessing <- function(df) {
   train_label <- as.data.frame(train_label);
   train_label$final_label <- NA;
   
-#It provide the final label. If agreed->fake news, else not fake
+  #It provide the final label. If agreed->fake news, else not fake
   
-  for (i in 1:length(train_label$id))
-    if(!is.na(train_label$agreed[i])) 
-      train_label$final_label[i] <-'fake'
-    else
-      train_label$final_label[i] <-'not fake'
-    
-    train_label$final_label[train_label$final_label=='not fake'] <- as.integer(0)
-    train_label$final_label[train_label$final_label=='fake'] <- as.integer(1)
-    
-    train_label_final <- train_label[c('id', 'news','final_label')]
-    train_label_final$news<- as.character(train_label_final$news)
-    return(train_label_final)
+  for (i in 1:length(train_label$id)){
+    if(!is.na(train_label$agreed[i])) {
+      train_label$final_label[i] <-'fake';
+    }
+    else {
+      train_label$final_label[i] <-'not fake';
+    }
+  }
+  train_label$final_label[train_label$final_label=='not fake'] <- as.integer(0);
+  train_label$final_label[train_label$final_label=='fake'] <- as.integer(1);
+  
+  train_label_final <- train_label[c('id', 'news','final_label')];
+  train_label_final$news<- as.character(train_label_final$news);
+  
+  return(train_label_final);
 }
-preprocessed_train_data <- dataPreprocessing(train)
 
 ## 75% of the sample size
 smp_size <- floor(0.75 * nrow(preprocessed_train_data))
