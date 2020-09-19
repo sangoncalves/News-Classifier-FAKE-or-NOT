@@ -85,7 +85,7 @@ splitDataset <- function(dataset, id) {
 
 ###################################### Logistic Regression
 preprocessed_train_data <- dataPreprocessing(fake_news_data)
-preprocessed_train_data$final_label <- factor(preprocessed_train_data$final_label)
+preprocessed_train_data$label <- factor(preprocessed_train_data$label)
 
 lr_dtm <- createCorpusAndDTM(preprocessed_train_data)
 
@@ -93,7 +93,7 @@ lr_dtm = removeSparseTerms(lr_dtm, 0.98);
 lr_dtm_sparse <- as.data.frame(as.matrix(lr_dtm))
 colnames(lr_dtm_sparse) = make.names(colnames(lr_dtm_sparse))
 
-lr_dtm_sparse$label = as.factor(preprocessed_train_data$final_label)
+lr_dtm_sparse$label = as.factor(preprocessed_train_data$label)
 
 set.seed(123)
 spl = sample.split(lr_dtm_sparse$label, 0.7)
