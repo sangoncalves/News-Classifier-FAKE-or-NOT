@@ -89,10 +89,10 @@ svm_train <- splitDataset(preprocessed_train_data, 1)
 svm_test <- splitDataset(preprocessed_train_data, 2)
 
 svm_train_input <-  svm_train %>% select('news')
-svm_train_label <- svm_train %>% select('final_label')
+svm_train_label <- svm_train %>% select('label')
 
 svm_test_input <- svm_test %>% select('news')
-svm_test_label <- svm_test %>% select('final_label')
+svm_test_label <- svm_test %>% select('label')
 
 matrix <- create_matrix(svm_train_input, language="english",removeNumbers=FALSE,removeStopwords = TRUE, stemWords=TRUE, removePunctuation=TRUE,toLower=TRUE, weighting=weightTfIdf)
 
@@ -117,4 +117,4 @@ snm_prediction_container <- create_container(svm_pred_matrix, labels=rep(0, svm_
 results <- classify_model(snm_prediction_container, model_svm)
 
 svm_test_label[test_index, ]
-Accuracy(results$SVM_LABEL, svm_test$final_label)
+Accuracy(results$SVM_LABEL, svm_test$label)
