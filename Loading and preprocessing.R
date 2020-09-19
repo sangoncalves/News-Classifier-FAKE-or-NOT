@@ -80,3 +80,41 @@ splitDataset <- function(dataset, id) {
   }
 }
 
+###################################### Naive Bayes 
+preprocessed_train_data <- dataPreprocessing(fake_news_data)
+preprocessed_train_data$final_label <- factor(preprocessed_train_data$final_label)
+
+dtm <- createCorpusAndDTM(preprocessed_train_data)
+
+# is this a new split?
+smp_size <- floor(0.75 * nrow(preprocessed_train_data));
+
+nb_train.labels <- preprocessed_train_data[1:smp_size, ]$final_label;
+nb_test.labels <- preprocessed_train_data[smp_size:nrow(preprocessed_train_data), ]$final_label;
+
+# split the document-term matrix
+nb_dtm.train <- dtm[1:smp_size, ];
+nb_dtm.test <- dtm[smp_size:nrow(preprocessed_train_data), ];
+
+#frequent terms and reduce dtm of train and test data. 
+nb_freq_terms = findFreqTerms(nb_dtm.train, 5);
+nb_dtm_freq.train <- nb_dtm.train[, nb_freq_terms]
+nb_dtm_freq.test <- nb_dtm.test[, nb_freq_terms]
+
+
+convert_counts <- function(x){
+  x <- ifelse(x > 0, "Yes", "No")
+}
+
+nb_reduced_dtm.train <- apply(nb_dtm_freq.train, MARGIN=2, convert_counts);
+nb_reduced_dtm.test  <- apply(nb_dtm_freq.test, MARGIN=2, convert_counts);
+
+
+# Training
+nb_classifier <- naiveBayes(nb_reduced_dtm.train, nb_train.labels);
+# Predicting
+nb_predict <- predict(nb_classifier, nb_reduced_dtm.test);
+
+# Accuracy
+nb_accuracy <- Accuracy(nb_predict, nb_test.labels)
+nb_accuracy
