@@ -16,7 +16,7 @@ library(readr)
 library(naivebayes)
 library(bnlearn)
 
-train = read_csv('train.csv', sep = ',', stringsAsFactors = F)
+fake_news_data = read_csv('train.csv', sep = ',', stringsAsFactors = F)
 
 
 #DEFINING FUNTIONS
@@ -31,24 +31,25 @@ dataPreprocessing <- function(df) {
                              names_from = 'label', 
                              values_from ='label');
   train_label <- as.data.frame(train_label);
-  train_label$final_label <- NA;
+  train_label$label <- NA;
   
   #It provide the final label. If agreed->fake news, else not fake
   
   for (i in 1:length(train_label$id)){
     if(!is.na(train_label$agreed[i])) {
-      train_label$final_label[i] <-'fake';
+      train_label$label[i] <-'fake';
     }
     else {
-      train_label$final_label[i] <-'not fake';
+      train_label$label[i] <-'not fake';
     }
   }
-  train_label$final_label[train_label$final_label=='not fake'] <- as.integer(0);
-  train_label$final_label[train_label$final_label=='fake'] <- as.integer(1);
+  train_label$label[train_label$label=='not fake'] <- as.integer(0);
+  train_label$label[train_label$label=='fake'] <- as.integer(1);
   
-  train_label_final <- train_label[c('id', 'news','final_label')];
-  train_label_final$news<- as.character(train_label_final$news);
-  
+  train_label_final <- train_label[c('id', 'news','label')];
+  train_label_final$news <- as.character(train_label_final$news);
+  train_label_final$label  <- factor(train_label_final$label)
+
   return(train_label_final);
 }
 
@@ -74,11 +75,12 @@ splitDataset <- function(dataset, id) {
   set.seed(123)
   train_index <- sample(seq_len(nrow(dataset)), size = smp_size)
   if (id == 1) {
-    return(dataset[train_index, ])
+    return(dataset[train_index, ]$label)
   } else {
-    return(dataset[-train_index, ])
+    return(dataset[-train_index, ]$label)
   }
 }
+
 
 
 ###################################### Logistic Regression
