@@ -80,3 +80,41 @@ splitDataset <- function(dataset, id) {
   }
 }
 
+
+
+###################################### Support Vector Machines (SVM)
+preprocessed_train_data <- dataPreprocessing(fake_news_data)
+
+svm_train <- splitDataset(preprocessed_train_data, 1)
+svm_test <- splitDataset(preprocessed_train_data, 2)
+
+svm_train_input <-  svm_train %>% select('news')
+svm_train_label <- svm_train %>% select('final_label')
+
+svm_test_input <- svm_test %>% select('news')
+svm_test_label <- svm_test %>% select('final_label')
+
+matrix <- create_matrix(svm_train_input, language="english",removeNumbers=FALSE,removeStopwords = TRUE, stemWords=TRUE, removePunctuation=TRUE,toLower=TRUE, weighting=weightTfIdf)
+
+train_size = nrow(svm_train_input)
+train_container <- create_container(matrix,t(svm_train_label),trainSize = 1:train_size,virgin=FALSE)
+
+# Training the svm model will take more time, you can load the our pretrained model from the 'models' folder 
+model_svm <- train_model(train_container, "SVM", kernel="linear", cost=1)
+
+set.seed(333)
+test_index <- sample(seq_len(nrow(svm_test_input)), size =5 )
+
+svm_prediction_data <- as.list(svm_test_input[test_index, ])
+
+svm_pred_matrix <- create_matrix(svm_prediction_data, originalMatrix=matrix) 
+
+# create the corresponding container
+svm_pred_size = length(svm_prediction_data);
+snm_prediction_container <- create_container(svm_pred_matrix, labels=rep(0, svm_pred_size), testSize=1:svm_pred_size, virgin=FALSE) 
+
+
+results <- classify_model(snm_prediction_container, model_svm)
+
+svm_test_label[test_index, ]
+Accuracy(results$SVM_LABEL, svm_test$final_label)
