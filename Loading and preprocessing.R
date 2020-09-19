@@ -16,7 +16,7 @@ library(readr)
 library(naivebayes)
 library(bnlearn)
 
-train = read_csv('train.csv', sep = ',', stringsAsFactors = F)
+fake_news_data = read_csv('train.csv', sep = ',', stringsAsFactors = F)
 
 
 #DEFINING FUNTIONS
