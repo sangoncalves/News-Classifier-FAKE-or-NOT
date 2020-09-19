@@ -80,3 +80,33 @@ splitDataset <- function(dataset, id) {
   }
 }
 
+
+###################################### Logistic Regression
+preprocessed_train_data <- dataPreprocessing(fake_news_data)
+preprocessed_train_data$final_label <- factor(preprocessed_train_data$final_label)
+
+lr_dtm <- createCorpusAndDTM(preprocessed_train_data)
+
+lr_dtm = removeSparseTerms(lr_dtm, 0.98);
+lr_dtm_sparse <- as.data.frame(as.matrix(lr_dtm))
+colnames(lr_dtm_sparse) = make.names(colnames(lr_dtm_sparse))
+
+lr_dtm_sparse$label = as.factor(preprocessed_train_data$final_label)
+
+set.seed(123)
+spl = sample.split(lr_dtm_sparse$label, 0.7)
+lr_train = subset(lr_dtm_sparse, spl == TRUE)
+lr_test = subset(lr_dtm_sparse, spl == FALSE)
+
+lr <- glm(label ~ ., data = lr_train, family = "binomial")
+lr_pred_train <- predict(lr, type = "response")
+
+# Accuracy on training 
+lr_prediction_trainLog = prediction(lr_pred_train, lr_train$label)
+lr_train_accuracy <- as.numeric(performance(lr_prediction_trainLog, "auc")@y.values)
+lr_train_accuracy
+
+lr_pred_test = predict(lr, newdata = lr_test, type="response")
+lr_prediction_testLog = prediction(lr_pred_test, lr_test$label)
+lr_accuracy <- as.numeric(performance(lr_prediction_testLog, "auc")@y.values)
+lr_accuracy
