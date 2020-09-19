@@ -92,6 +92,8 @@ smp_size <- floor(0.75 * nrow(preprocessed_train_data));
 nb_train.labels <- preprocessed_train_data[1:smp_size, ]$final_label;
 nb_test.labels <- preprocessed_train_data[smp_size:nrow(preprocessed_train_data), ]$final_label;
 
+nb_train.labels  <- 
+
 # split the document-term matrix
 nb_dtm.train <- dtm[1:smp_size, ];
 nb_dtm.test <- dtm[smp_size:nrow(preprocessed_train_data), ];
