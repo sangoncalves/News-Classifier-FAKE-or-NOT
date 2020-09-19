@@ -1,12 +1,25 @@
 library(keras)
-library(dplyr)
 library(ggplot2)
-library(readr)
 library(purrr)
+library(e1071)
+library(gmodels)
+library(MLmetrics)
+library(kernlab)
+library(ROCR)
+library(tm)
+library(dplyr)
+library(tidyselect)
 library(tidyr)
+library(caTools)
+library(RTextTools)
+library(readr)
+library(naivebayes)
+library(bnlearn)
 
 train = read_csv('train.csv', sep = ',', stringsAsFactors = F)
 
+
+#DEFINING FUNTIONS
 dataPreprocessing <- function(df) {
   df_train <- data.frame('id' = df$tid2 , 
                          'news' = df$title2_en, 
@@ -39,12 +52,31 @@ dataPreprocessing <- function(df) {
   return(train_label_final);
 }
 
-## 75% of the sample size
-smp_size <- floor(0.75 * nrow(preprocessed_train_data))
 
-## set the seed to make your partition reproducible
-set.seed(123)
-train_index <- sample(seq_len(nrow(preprocessed_train_data)), size = smp_size)
+# Creating Corpus and Generating DTM
+createCorpusAndDTM <- function(dataset) {
+  nb_corpus <- VCorpus(VectorSource(dataset$news));
+  nb_corpus_clean <- tm_map(nb_corpus, content_transformer(tolower));
+  nb_corpus_clean <- tm_map(nb_corpus_clean, content_transformer(removeNumbers));
+  nb_corpus_clean <- tm_map(nb_corpus_clean, removePunctuation);
+  nb_corpus_clean <- tm_map(nb_corpus_clean, removeWords,stopwords());
+  nb_corpus_clean <- tm_map(nb_corpus_clean, stemDocument);
+  nb_corpus_clean <- tm_map(nb_corpus_clean, stripWhitespace);
+  doc_matrix = DocumentTermMatrix(nb_corpus_clean);
+  
+  return(doc_matrix);
+}
+  ## 75% of the sample size
+splitDataset <- function(dataset, id) {
+  smp_size <- floor(0.75 * nrow(dataset))
+  
+  ## set the seed to make your partition reproducible
+  set.seed(123)
+  train_index <- sample(seq_len(nrow(dataset)), size = smp_size)
+  if (id == 1) {
+    return(dataset[train_index, ])
+  } else {
+    return(dataset[-train_index, ])
+  }
+}
 
-train <- preprocessed_train_data[train_index, ]
-verification <- preprocessed_train_data[-train_index, ]
