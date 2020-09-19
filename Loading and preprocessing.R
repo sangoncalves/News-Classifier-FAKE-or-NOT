@@ -31,24 +31,25 @@ dataPreprocessing <- function(df) {
                              names_from = 'label', 
                              values_from ='label');
   train_label <- as.data.frame(train_label);
-  train_label$final_label <- NA;
+  train_label$label <- NA;
   
   #It provide the final label. If agreed->fake news, else not fake
   
   for (i in 1:length(train_label$id)){
     if(!is.na(train_label$agreed[i])) {
-      train_label$final_label[i] <-'fake';
+      train_label$label[i] <-'fake';
     }
     else {
-      train_label$final_label[i] <-'not fake';
+      train_label$label[i] <-'not fake';
     }
   }
-  train_label$final_label[train_label$final_label=='not fake'] <- as.integer(0);
-  train_label$final_label[train_label$final_label=='fake'] <- as.integer(1);
+  train_label$label[train_label$label=='not fake'] <- as.integer(0);
+  train_label$label[train_label$label=='fake'] <- as.integer(1);
   
-  train_label_final <- train_label[c('id', 'news','final_label')];
-  train_label_final$news<- as.character(train_label_final$news);
-  
+  train_label_final <- train_label[c('id', 'news','label')];
+  train_label_final$news <- as.character(train_label_final$news);
+  train_label_final$label  <- factor(train_label_final$label)
+
   return(train_label_final);
 }
 
@@ -74,25 +75,24 @@ splitDataset <- function(dataset, id) {
   set.seed(123)
   train_index <- sample(seq_len(nrow(dataset)), size = smp_size)
   if (id == 1) {
-    return(dataset[train_index, ])
+    return(dataset[train_index, ]$label)
   } else {
-    return(dataset[-train_index, ])
+    return(dataset[-train_index, ]$label)
   }
 }
 
 ###################################### Naive Bayes 
 preprocessed_train_data <- dataPreprocessing(fake_news_data)
-preprocessed_train_data$final_label <- factor(preprocessed_train_data$final_label)
 
 dtm <- createCorpusAndDTM(preprocessed_train_data)
 
 # is this a new split?
 smp_size <- floor(0.75 * nrow(preprocessed_train_data));
 
-nb_train.labels <- preprocessed_train_data[1:smp_size, ]$final_label;
-nb_test.labels <- preprocessed_train_data[smp_size:nrow(preprocessed_train_data), ]$final_label;
+nb_train.labels <- preprocessed_train_data[1:smp_size, ]$label;
+nb_test.labels <- preprocessed_train_data[smp_size:nrow(preprocessed_train_data), ]$label;
 
-nb_train.labels  <- 
+nb_train.labels  <- splitDataset(preprocessed_train_data)
 
 # split the document-term matrix
 nb_dtm.train <- dtm[1:smp_size, ];
