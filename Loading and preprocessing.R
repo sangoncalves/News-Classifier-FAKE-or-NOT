@@ -85,7 +85,6 @@ splitDataset <- function(dataset, id) {
 
 ###################################### Logistic Regression
 preprocessed_train_data <- dataPreprocessing(fake_news_data)
-preprocessed_train_data$label <- factor(preprocessed_train_data$label)
 
 lr_dtm <- createCorpusAndDTM(preprocessed_train_data)
 
