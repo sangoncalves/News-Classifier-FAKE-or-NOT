@@ -79,7 +79,7 @@ splitDataset <- function(dataset, id) {
   } else {
     return(dataset[-train_index, ]$label)
   }
-
+}
 
 
 ###################################### Support Vector Machines (SVM)
