@@ -1,3 +1,4 @@
+###################################### LOADING LIBRARIES
 library(keras)
 library(ggplot2)
 library(purrr)
@@ -16,10 +17,10 @@ library(readr)
 library(naivebayes)
 library(bnlearn)
 
-fake_news_data = read_csv('train.csv', sep = ',', stringsAsFactors = F)
 
+###################################### DEFINING FUNCTIONS
 
-#DEFINING FUNTIONS
+#1 - PREPROCESSING FUNCTION - USED BY ALL MODELS
 dataPreprocessing <- function(df) {
   df_train <- data.frame('id' = df$tid2 , 
                          'news' = df$title2_en, 
@@ -49,12 +50,11 @@ dataPreprocessing <- function(df) {
   train_label_final <- train_label[c('id', 'news','label')];
   train_label_final$news <- as.character(train_label_final$news);
   train_label_final$label  <- factor(train_label_final$label)
-
+  
   return(train_label_final);
 }
 
-
-# Creating Corpus and Generating DTM
+#2-  Creating Corpus and Generating DTM - NAIVE BAYES AND LOGISTIC REGRESSION REQUIREMENT
 createCorpusAndDTM <- function(dataset) {
   nb_corpus <- VCorpus(VectorSource(dataset$news));
   nb_corpus_clean <- tm_map(nb_corpus, content_transformer(tolower));
@@ -64,59 +64,60 @@ createCorpusAndDTM <- function(dataset) {
   nb_corpus_clean <- tm_map(nb_corpus_clean, stemDocument);
   nb_corpus_clean <- tm_map(nb_corpus_clean, stripWhitespace);
   doc_matrix = DocumentTermMatrix(nb_corpus_clean);
+  dtm = removeSparseTerms(doc_matrix, 0.98);
+  dtm_sparse <- as.data.frame(as.matrix(dtm))
+  colnames(dtm_sparse) = make.names(colnames(dtm_sparse))
+  #dtm_sparse$label = as.factor(dataset$label)
   
-  return(doc_matrix);
-}
-  ## 75% of the sample size
-splitDataset <- function(dataset, id) {
-  smp_size <- floor(0.75 * nrow(dataset))
-  
-  ## set the seed to make your partition reproducible
-  set.seed(123)
-  train_index <- sample(seq_len(nrow(dataset)), size = smp_size)
-  if (id == 1) {
-    return(dataset[train_index, ]$label)
-  } else {
-    return(dataset[-train_index, ]$label)
-  }
+  return(dtm_sparse);
 }
 
-###################################### Naive Bayes 
-preprocessed_train_data <- dataPreprocessing(fake_news_data)
-
-dtm <- createCorpusAndDTM(preprocessed_train_data)
-
-# is this a new split?
-smp_size <- floor(0.75 * nrow(preprocessed_train_data));
-
-nb_train.labels <- preprocessed_train_data[1:smp_size, ]$label;
-nb_test.labels <- preprocessed_train_data[smp_size:nrow(preprocessed_train_data), ]$label;
-
-nb_train.labels  <- splitDataset(preprocessed_train_data)
-
-# split the document-term matrix
-nb_dtm.train <- dtm[1:smp_size, ];
-nb_dtm.test <- dtm[smp_size:nrow(preprocessed_train_data), ];
-
-#frequent terms and reduce dtm of train and test data. 
-nb_freq_terms = findFreqTerms(nb_dtm.train, 5);
-nb_dtm_freq.train <- nb_dtm.train[, nb_freq_terms]
-nb_dtm_freq.test <- nb_dtm.test[, nb_freq_terms]
-
-
+#3 -CONVERTING THE FACTOR FROM STRING TO INTEGER - NAIVE BAYES MODEL REQUIREMENT
 convert_counts <- function(x){
   x <- ifelse(x > 0, "Yes", "No")
 }
 
-nb_reduced_dtm.train <- apply(nb_dtm_freq.train, MARGIN=2, convert_counts);
-nb_reduced_dtm.test  <- apply(nb_dtm_freq.test, MARGIN=2, convert_counts);
+###################################### PREPROCESSING - ALL MODELS
+fake_news_data = read_csv('train.csv', sep = ',', stringsAsFactors = F)
+preprocessed.data <- dataPreprocessing(fake_news_data)
+preprocessed.label <- preprocessed.data %>% select('label')
+
+#splitting the data and getting the variables ready for the models
+smp_size <- floor(0.75 * nrow(preprocessed.data))
+train_index <- sample(seq_len(nrow(preprocessed.data)), size = smp_size)
+##train variables
+train.input <- preprocessed.data[train_index, ] %>% select('news')
+train.label <- preprocessed.data[train_index, ] %>% select('label')
+train.data  <- preprocessed.data[train_index, ]
+##test variables
+test.input <- preprocessed.data[-train_index, ] %>% select('news')
+test.label <- preprocessed.data[-train_index, ] %>% select('label')
+test.data  <- preprocessed.data[-train_index, ]
+
+# DTM 
+dtm.train <- as.factor(preprocessed.label) %>%  createCorpusAndDTM(train.data)
+dtm.test  <- as.factor(preprocessed.label) %>%  createCorpusAndDTM(test.data)
+dtm.data  <- as.factor(preprocessed.label) %>%  createCorpusAndDTM(preprocessed.data)
+dtm.data.news <- createCorpusAndDTM(preprocessed.label)
 
 
+# FT, INTEGER LABEL AND REDUCED DTM - RELATED TO NAIVE BAYES MODEL
+
+#frequent terms and reduce dtm of train and test data. 
+dtm_freq_terms = findFreqTerms(dtm.data, 5);
+dtm_freq.train <- dtm.train[, dtm_freq_terms]
+dtm_freq.test <- dtm.test[, dtm_freq_terms]
+
+# NAIVE BAYES - uses 0|1 input instead of string (fake | not fake)
+reduced_dtm.train <- apply(dtm_freq.train, MARGIN=2, convert_counts);
+reduced_dtm.test  <- apply(dtm_freq.test, MARGIN=2, convert_counts);
+
+###################################### NAIVE BAYES MODEL
 # Training
-nb_classifier <- naiveBayes(nb_reduced_dtm.train, nb_train.labels);
+nb_classifier <- naiveBayes(reduced_dtm.train, train.labels);
 # Predicting
-nb_predict <- predict(nb_classifier, nb_reduced_dtm.test);
+nb_predict <- predict(nb_classifier, reduced_dtm.test);
 
 # Accuracy
-nb_accuracy <- Accuracy(nb_predict, nb_test.labels)
+nb_accuracy <- Accuracy(nb_predict, test.labels)
 nb_accuracy
