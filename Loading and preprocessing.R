@@ -1,3 +1,4 @@
+###################################### LOADING LIBRARIES
 library(keras)
 library(ggplot2)
 library(purrr)
@@ -16,10 +17,10 @@ library(readr)
 library(naivebayes)
 library(bnlearn)
 
-fake_news_data = read_csv('train.csv', sep = ',', stringsAsFactors = F)
 
+###################################### DEFINING FUNCTIONS
 
-#DEFINING FUNTIONS
+#1 - PREPROCESSING FUNCTION - USED BY ALL MODELS
 dataPreprocessing <- function(df) {
   df_train <- data.frame('id' = df$tid2 , 
                          'news' = df$title2_en, 
@@ -49,12 +50,11 @@ dataPreprocessing <- function(df) {
   train_label_final <- train_label[c('id', 'news','label')];
   train_label_final$news <- as.character(train_label_final$news);
   train_label_final$label  <- factor(train_label_final$label)
-
+  
   return(train_label_final);
 }
 
-
-# Creating Corpus and Generating DTM
+#2-  Creating Corpus and Generating DTM - NAIVE BAYES AND LOGISTIC REGRESSION REQUIREMENT
 createCorpusAndDTM <- function(dataset) {
   nb_corpus <- VCorpus(VectorSource(dataset$news));
   nb_corpus_clean <- tm_map(nb_corpus, content_transformer(tolower));
@@ -64,50 +64,65 @@ createCorpusAndDTM <- function(dataset) {
   nb_corpus_clean <- tm_map(nb_corpus_clean, stemDocument);
   nb_corpus_clean <- tm_map(nb_corpus_clean, stripWhitespace);
   doc_matrix = DocumentTermMatrix(nb_corpus_clean);
+  dtm = removeSparseTerms(doc_matrix, 0.98);
+  dtm_sparse <- as.data.frame(as.matrix(dtm))
+  colnames(dtm_sparse) = make.names(colnames(dtm_sparse))
+  #dtm_sparse$label = as.factor(dataset$label)
   
-  return(doc_matrix);
-}
-  ## 75% of the sample size
-splitDataset <- function(dataset, id) {
-  smp_size <- floor(0.75 * nrow(dataset))
-  
-  ## set the seed to make your partition reproducible
-  set.seed(123)
-  train_index <- sample(seq_len(nrow(dataset)), size = smp_size)
-  if (id == 1) {
-    return(dataset[train_index, ]$label)
-  } else {
-    return(dataset[-train_index, ]$label)
-  }
+  return(dtm_sparse);
 }
 
+#3 -CONVERTING THE FACTOR FROM STRING TO INTEGER - NAIVE BAYES MODEL REQUIREMENT
+convert_counts <- function(x){
+  x <- ifelse(x > 0, "Yes", "No")
+}
+
+###################################### PREPROCESSING - ALL MODELS
+fake_news_data = read_csv('train.csv', sep = ',', stringsAsFactors = F)
+preprocessed.data <- dataPreprocessing(fake_news_data)
+preprocessed.label <- preprocessed.data %>% select('label')
+
+#splitting the data and getting the variables ready for the models
+smp_size <- floor(0.75 * nrow(preprocessed.data))
+train_index <- sample(seq_len(nrow(preprocessed.data)), size = smp_size)
+##train variables
+train.input <- preprocessed.data[train_index, ] %>% select('news')
+train.label <- preprocessed.data[train_index, ] %>% select('label')
+train.data  <- preprocessed.data[train_index, ]
+##test variables
+test.input <- preprocessed.data[-train_index, ] %>% select('news')
+test.label <- preprocessed.data[-train_index, ] %>% select('label')
+test.data  <- preprocessed.data[-train_index, ]
+
+# DTM 
+dtm.train <- as.factor(preprocessed.label) %>%  createCorpusAndDTM(train.data)
+dtm.test  <- as.factor(preprocessed.label) %>%  createCorpusAndDTM(test.data)
+dtm.data  <- as.factor(preprocessed.label) %>%  createCorpusAndDTM(preprocessed.data)
+dtm.data.news <- createCorpusAndDTM(preprocessed.label)
 
 
-###################################### Logistic Regression
-preprocessed_train_data <- dataPreprocessing(fake_news_data)
+# FT, INTEGER LABEL AND REDUCED DTM - RELATED TO NAIVE BAYES MODEL
 
-lr_dtm <- createCorpusAndDTM(preprocessed_train_data)
+#frequent terms and reduce dtm of train and test data. 
+dtm_freq_terms = findFreqTerms(dtm.data, 5);
+dtm_freq.train <- dtm.train[, dtm_freq_terms]
+dtm_freq.test <- dtm.test[, dtm_freq_terms]
 
-lr_dtm = removeSparseTerms(lr_dtm, 0.98);
-lr_dtm_sparse <- as.data.frame(as.matrix(lr_dtm))
-colnames(lr_dtm_sparse) = make.names(colnames(lr_dtm_sparse))
+# NAIVE BAYES - uses 0|1 input instead of string (fake | not fake)
+reduced_dtm.train <- apply(dtm_freq.train, MARGIN=2, convert_counts);
+reduced_dtm.test  <- apply(dtm_freq.test, MARGIN=2, convert_counts);
 
-lr_dtm_sparse$label = as.factor(preprocessed_train_data$label)
 
-set.seed(123)
-spl = sample.split(lr_dtm_sparse$label, 0.7)
-lr_train = subset(lr_dtm_sparse, spl == TRUE)
-lr_test = subset(lr_dtm_sparse, spl == FALSE)
-
+###################################### LOGISTIC REGRESSION MODEL
 lr <- glm(label ~ ., data = lr_train, family = "binomial")
-lr_pred_train <- predict(lr, type = "response")
+lr_pred.train <- predict(lr, type = "response")
 
 # Accuracy on training 
-lr_prediction_trainLog = prediction(lr_pred_train, lr_train$label)
+lr_prediction_trainLog = prediction(lr_pred.train, lr_train$label)
 lr_train_accuracy <- as.numeric(performance(lr_prediction_trainLog, "auc")@y.values)
 lr_train_accuracy
 
-lr_pred_test = predict(lr, newdata = lr_test, type="response")
-lr_prediction_testLog = prediction(lr_pred_test, lr_test$label)
+lr_pred_test = predict(lr, newdata = dtm.train, type="response")
+lr_prediction_testLog = prediction(lr_pred_test, dtm.train$label)
 lr_accuracy <- as.numeric(performance(lr_prediction_testLog, "auc")@y.values)
 lr_accuracy
