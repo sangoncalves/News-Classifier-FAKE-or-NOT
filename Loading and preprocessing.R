@@ -1,22 +1,13 @@
 ###################################### LOADING LIBRARIES
-library(keras)
-library(ggplot2)
-library(purrr)
-library(e1071)
-library(gmodels)
-library(MLmetrics)
-library(kernlab)
-library(ROCR)
-library(tm)
-library(dplyr)
-library(tidyselect)
 library(tidyr)
-library(caTools)
-library(RTextTools)
 library(readr)
+library(dplyr)
+library(tm)
 library(naivebayes)
-library(bnlearn)
-
+library(caTools)
+library(ROCR)
+library(RTextTools)
+library(MLmetrics)
 
 ###################################### DEFINING FUNCTIONS
 
@@ -64,11 +55,6 @@ createCorpusAndDTM <- function(dataset) {
   nb_corpus_clean <- tm_map(nb_corpus_clean, stemDocument);
   nb_corpus_clean <- tm_map(nb_corpus_clean, stripWhitespace);
   doc_matrix = DocumentTermMatrix(nb_corpus_clean);
-  # dtm = removeSparseTerms(doc_matrix, 0.98);
-  # dtm_sparse <- as.data.frame(as.matrix(dtm))
-  # colnames(dtm_sparse) = make.names(colnames(dtm_sparse))
-  # #dtm_sparse$label = as.factor(dataset$label)
-  
   return(doc_matrix);
 }
 
@@ -96,22 +82,31 @@ test.label <- processed.data[-train_index, ] %>% select('label')
 test.data  <- processed.data[-train_index, ]
 
 
-##############################NB
+###################################### NAIVE BAYES MODEL
+## PROCESSING
 # DTM 
 dtm <- createCorpusAndDTM(processed.data)
 # split the document-term matrix
-dtm.train <- dtm[1:smp_size, ];
-dtm.test <- dtm[smp_size:nrow(processed.data), ];
-freq_terms = findFreqTerms(dtm.train, 5);
+dtm.train <- dtm[1:smp_size, ]
+dtm.test <- dtm[smp_size:nrow(processed.data), ]
+freq_terms = findFreqTerms(dtm.train, 5)
 dtm_freq.train <- dtm.train[, freq_terms]
 dtm_freq.test <- dtm.test[, freq_terms]
-reduced_dtm.train <- apply(dtm_freq.train, MARGIN=2, convert_counts);
-reduced_dtm.test  <- apply(dtm_freq.test, MARGIN=2, convert_counts);
+reduced_dtm.train <- apply(dtm_freq.train, MARGIN=2, convert_counts)
+reduced_dtm.test  <- apply(dtm_freq.test, MARGIN=2, convert_counts)
 
-############################## above is working and ok for NB
+## MODEL
+# Training
+nb_classifier <- naiveBayes(reduced_dtm.train, train.labels)
+# Predicting
+nb_predict <- predict(nb_classifier, reduced_dtm.test)
 
-############################## LR
+# Accuracy
+nb_accuracy <- Accuracy(nb_predict, test.labels)
+nb_accuracy
 
+###################################### LOGISTIC REGRESSION MODEL
+## PROCESSING
 dtm_sparse <- removeSparseTerms(dtm, 0.98)
 dtm_sparse <- as.data.frame(as.matrix(dtm_sparse))
 colnames(dtm_sparse) = make.names(colnames(dtm_sparse))
@@ -121,16 +116,29 @@ set.seed(123)
 spl = sample.split(dtm_sparse$label, 0.7)
 dtm_sparse.train = subset(dtm_sparse, spl == TRUE)
 dtm_sparse.test = subset(dtm_sparse, spl == FALSE)
-############################## above is working and ok for LR
 
-############################## SVM
+## MODEL
+lr <- glm(label ~ ., data = dtm_sparse.train, family = "binomial")
+lr_pred.train <- predict(lr, type = "response")
+
+# Accuracy on training 
+lr_prediction_trainLog = prediction(lr_pred.train, dtm_sparse.train$label)
+lr_train_accuracy <- as.numeric(performance(lr_prediction_trainLog, "auc")@y.values)
+lr_train_accuracy
+
+# Accuracy on test 
+lr_pred_test = predict(lr, newdata = dtm_sparse.test, type="response")
+lr_prediction_testLog = prediction(lr_pred_test, dtm_sparse.test$label)
+lr_accuracy <- as.numeric(performance(lr_prediction_testLog, "auc")@y.values)
+lr_accuracy
+
+###################################### SUPPORT VECTOR MACHINE MODEL
+## PROCESSING
 dtm_train.input <- createCorpusAndDTM(train.input)
 train_size = nrow(train.input)
 train_input_container <- create_container(dtm_train.input,t(train.input),trainSize = 1:train_size,virgin=FALSE)
-############################## above is working and ok for SVM
 
-###################################### SUPPORT VECTOR MACHINE MODEL
-
+## MODEL
 # Training the svm model will take more time, you can load the our pretrained model from the 'models' folder 
 model_svm <- train_model(train_input_container, "SVM", kernel="linear", cost=1)
 
@@ -143,33 +151,12 @@ svm_pred_matrix <- create_matrix(svm_prediction_data, originalMatrix=dtm.data.ne
 svm_pred_size = length(svm_prediction_data);
 snm_prediction_container <- create_container(svm_pred_matrix, labels=rep(0, svm_pred_size), testSize=1:svm_pred_size, virgin=FALSE) 
 
-
 results <- classify_model(snm_prediction_container, model_svm)
-
 svm_test_label[test_index, ]
+
+# Accuracy on test
 Accuracy(results$SVM_LABEL, test.label)
 
-###################################### LOGISTIC REGRESSION MODEL
-lr <- glm(label ~ ., data = dtm_sparse.train, family = "binomial")
-lr_pred.train <- predict(lr, type = "response")
-
-# Accuracy on training 
-lr_prediction_trainLog = prediction(lr_pred.train, dtm_sparse.train$label)
-lr_train_accuracy <- as.numeric(performance(lr_prediction_trainLog, "auc")@y.values)
-lr_train_accuracy
-
-lr_pred_test = predict(lr, newdata = dtm_sparse.test, type="response")
-lr_prediction_testLog = prediction(lr_pred_test, dtm_sparse.test$label)
-lr_accuracy <- as.numeric(performance(lr_prediction_testLog, "auc")@y.values)
-lr_accuracy
 
 
-###################################### NAIVE BAYES MODEL
-# Training
-nb_classifier <- naiveBayes(reduced_dtm.train, train.labels);
-# Predicting
-nb_predict <- predict(nb_classifier, reduced_dtm.test);
 
-# Accuracy
-nb_accuracy <- Accuracy(nb_predict, test.labels)
-nb_accuracy
