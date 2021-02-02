@@ -73,9 +73,9 @@ generateDTM <- function(df) {
 DTM_df <- generateDTM(clean_data)
 
 set.seed(50)
-spl = sample.split(freq_df$label, 0.7)
-train_dtm = subset(freq_df, spl == TRUE)
-test_dtm = subset(freq_df, spl == FALSE)
+spl = sample.split(DTM_df$label, 0.7)
+train_dtm = subset(DTM_df, spl == TRUE)
+test_dtm = subset(DTM_df, spl == FALSE)
 
 LR <- function(train, test) {
   log_model <- glm(label ~ ., data=train, family="binomial")
