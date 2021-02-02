@@ -109,6 +109,6 @@ RF <- function(train, test) {
 
 predict_RF <- RF(train_dtm, test_dtm)
 accuracy_RF <- calculateAccuracy(test_dtm$label, predict_RF)
-paste('Accuracy of LR: ', accuracy_RF)
+paste('Accuracy of RF: ', accuracy_RF)
 
 
