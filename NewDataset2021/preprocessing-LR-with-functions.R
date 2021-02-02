@@ -3,13 +3,12 @@ library(dplyr)
 library(stringr)
 library(ggplot2)
 library(tidyr)
-library(tm)       
-library(textstem)     
+library(tm)
+library(textstem)
 library(tidytext)
-library(wordcloud2)
 library(pROC)
 library(ROCR)
-library(randomForest)   
+library(randomForest)
 library(naivebayes)
 library(caret)
 library(caTools)
@@ -60,9 +59,6 @@ generateDTM <- function(df) {
   
   summary(freq_matrix[, 'label'])
   
-  # as.data.frame(freq_matrix) %>% count(label)
-  # shuffled_data %>% count(label)
-  
   freq_df <- as.data.frame(freq_matrix)
   freq_df$label <- ifelse(freq_df$label == 1, 0, 1)
   freq_df$label <- as.factor(freq_df$label)
@@ -101,6 +97,8 @@ accuracy_LR <- calculateAccuracy(test_dtm$label, predict_LR)
 paste('Accuracy of LR: ', accuracy_LR)
 
 RF <- function(train, test) {
+  names(train) <- make.names(names(train))
+  names(test) <- make.names(names(test))
   k <- round(sqrt(ncol(train)-1))
   rf_model <- randomForest(label ~ ., data = train, ntree = 100, mtry = k, method = 'class')
   
@@ -110,9 +108,7 @@ RF <- function(train, test) {
 }
 
 predict_RF <- RF(train_dtm, test_dtm)
+accuracy_RF <- calculateAccuracy(test_dtm$label, predict_RF)
+paste('Accuracy of LR: ', accuracy_RF)
 
-k <- round(sqrt(ncol(train_dtm)-1))
-rf_model <- randomForest(label ~ ., data = train_dtm, ntree = 100, mtry = k, method = 'class')
-
-pred_test <- predict(rf_model, newdata = test, type = 'response')
 
