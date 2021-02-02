@@ -44,7 +44,7 @@ generateDTM <- function(df) {
   corpus <- tm_map(corpus, removeNumbers)
   corpus <- tm_map(corpus, removeWords, stopwords('en'))
   corpus <- tm_map(corpus, stripWhitespace)
-  
+  corpus <- tm_map(corpus, content_transformer(str_remove_all), "[[:punct:]]")
   corpus <- tm_map(corpus, content_transformer(lemmatize_strings))
   
   freq <- DocumentTermMatrix(corpus)
@@ -93,8 +93,26 @@ predict_LR <- LR(train_dtm, test_dtm)
 
 calculateAccuracy <- function(test_labels, predict_labels) {
   cf <- caret::confusionMatrix(test_labels, predict_labels)
-  acc <- conf_lr[['overall']]['Accuracy']
+  acc <- cf[['overall']]['Accuracy']
   return(acc);
 }
 
-accuracy_LR <- calculateAccuracy(test$label, predict_LR)
+accuracy_LR <- calculateAccuracy(test_dtm$label, predict_LR)
+paste('Accuracy of LR: ', accuracy_LR)
+
+RF <- function(train, test) {
+  k <- round(sqrt(ncol(train)-1))
+  rf_model <- randomForest(label ~ ., data = train, ntree = 100, mtry = k, method = 'class')
+  
+  pred_test <- predict(rf_model, newdata = test, type = 'response')
+  
+  return(pred_test);
+}
+
+predict_RF <- RF(train_dtm, test_dtm)
+
+k <- round(sqrt(ncol(train_dtm)-1))
+rf_model <- randomForest(label ~ ., data = train_dtm, ntree = 100, mtry = k, method = 'class')
+
+pred_test <- predict(rf_model, newdata = test, type = 'response')
+
