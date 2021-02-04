@@ -1,0 +1,227 @@
+---
+title: "Fake New Classification 2021"
+author: "Sander Martins Goncalves & Nisha Antony"
+date: "2/3/2021"
+output: html_document
+---
+
+## **Introduction**
+
+### Project
+
+Trustful information is essential to the humanity since we act based on it, mainly in regard to aspects of life such as economy, politics and even safety. As flow of information increases each day and the production and sharing of contents becomes easier, the quality of information decreases. People sometimes gives priority to the impulse of sharing, more than to the verification. Moreover, more than just cases where a person shares not verified contents, the bigger problem arises when people has actual goal to distort information for personal gain, in what is called the manipulation of the masses. Having this context in mind that this project arises, in an attempt to test and compare what models perform better in recognizing if an information is fake or not.
+
+### Dataset
+
+The data used for this project was collected from real-world sources. The dataset we used in this project consists of two CSV files: "True.csv" for truthful news articles and "Fake.csv" fake news articles. The real news articles were obtained by crawling various news websites whereas, the fake news articles were collected from unreliable websites that were flagged by fact-checking organizations and Wikipedia. The dataset conatains article title, text, subject, and the date published. Since we have the collection of fake and real news articles in separate csv files, we combine and shuffle the two. We assign appropriate labels for the news articles before combining them. The label of fake news articles are set as 1 and others are set as 0.     
+
+Now let's load our input dataset and create the shuffled data which is used for classification.
+
+```{r}
+fake <- read.csv('Fake.csv', stringsAsFactors = F)
+fake$label <- 1
+
+true <- read.csv('True.csv', stringsAsFactors = F)
+true$label <- 0
+
+data <- rbind.data.frame(fake, true)
+set.seed(50)
+
+rows <- sample(nrow(data))
+shuffled_data <- data[rows, ]
+
+```
+> As you can see, the train dataset contains 5 columns: 
+
+
+* title - title of the news article
+* text - content of the news article
+* subject - name of the news category like: Political news, World news, Government news, etc
+* label - indicates type of article: real(0) or fake(1)
+
+## Models and Techniques Used
+
+There are many different algorithms we can choose from when doing text classification. The techniques we used for the implemenation of this project are Logistic Regression(LR), Random Forest(RF) and Naive Bayes (NB)
+
+## Implementation & Evaluation of Models
+In order to implement the algorithms, is necessary to change its format in a way that is suitable to be the input of the models. The models used in this project, takes Document Term Matrix(DTM) as their input. So we have to preprocess the textual data into this format before the training process.
+
+> The implementation plan for each model is as follows:
+
+* Data Pre-processing
+* DTM generation 
+* Spliting dataset into Train and Test
+* Build & train the models
+* Prediction on Test data 
+* Evaluation of the models using Test data
+
+### Data Preprocessing
+
+Data Preprocessing is a common process for all models of this project. It is respect to the analysis the data and getting the final label for each news. As explained, each row of the dataset is a comparison between *Title1*(fake news) and *Title2*(news). In order to decide if *Title2 news* is fake or not, is necessary to check and compare the entire dataset. Given all comparison related to each *Title2 news*, if one or more label "Agreed" is found, this news receive the final label as "fake" (or 1 for training). After the phase of data preprocessing, there are two different paths to follow accordig to the models. The models Naive Bayes (NB) and Logistic Regression require the creation of "Corpus" and "DTM" and the *split of the data*. By the other hand, the other models do not require "*Corpus*" or "*DTM*", allowing the process to go directly to the *split of the data*.
+
+```{r}
+datapreprocessing <- function(data) {
+  data$label <- as.factor(data$label)
+  data$subject <- as.factor(data$subject)
+  data <- data %>% select(title, text, label) %>% unite(col = text, title, text, sep = ' ') %>% mutate(ID = as.character(1:nrow(data)))
+  
+  return(data)
+}
+```
+
+```{r}
+clean_data <- datapreprocessing(shuffled_data)
+```
+
+### DTM generation
+
+This part is responsible for creating a clean Corpus that will remove all not necessary words and characters in order to improve the learning of the models.
+
+```{r}
+generateDTM <- function(df) {
+  corpus <- Corpus(VectorSource(df$text))
+  corpus <- tm_map(corpus, tolower)
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, removeWords, stopwords('en'))
+  corpus <- tm_map(corpus, stripWhitespace)
+  corpus <- tm_map(corpus, content_transformer(str_remove_all), "[[:punct:]]")
+  corpus <- tm_map(corpus, content_transformer(lemmatize_strings))
+  
+  freq <- DocumentTermMatrix(corpus)
+  # inspect(freq)
+  
+  freq_clean <- removeSparseTerms(freq, 0.97)
+  # inspect(freq_clean)
+  
+  freq_matrix <- as.matrix(freq_clean)
+  # dim(freq_matrix)
+  
+  freq_matrix <- cbind(freq_matrix, label = shuffled_data$label)
+  
+  summary(freq_matrix[, 'label'])
+  
+  freq_df <- as.data.frame(freq_matrix)
+  freq_df$label <- ifelse(freq_df$label == 1, 0, 1)
+  freq_df$label <- as.factor(freq_df$label)
+  
+  return(freq_df);
+}
+```
+
+```{r}
+DTM_df <- generateDTM(clean_data)
+```
+
+### Splitting Data
+At this stage the data is ready to be subdivided into *training* and *test* and ready to be used as *input*.
+
+```{r}
+set.seed(50)
+spl = sample.split(DTM_df$label, 0.7)
+train_dtm = subset(DTM_df, spl == TRUE)
+test_dtm = subset(DTM_df, spl == FALSE)
+```
+
+### Logistic Regression
+
+Logistic regression is a statistical machine learning algorithm that classifies the data by considering outcome variables on extreme ends and this algorithm is providing a discriminatory line between classes. Compared to another simple model, linear regression, which requires hard threshold in classification, logistic regression can overcome threshold values for a large dataset. Logistic regression produces a logistic curve, which is limited to values between 0 to 1, by adding sigmoid function in the end.
+
+```{r}
+LR <- function(train, test) {
+  # Training LR model
+  # log_model <- glm(label ~ ., data=train, family="binomial")
+  
+  # saving the trained model 
+  # save(log_model, file = "./models/LR_model.RData")
+  
+  log_model <- load("./models/LR_model.RData")
+  pred_test <- predict(log_model, newdata = test, type = 'response')
+  
+  # setting threshold for LR
+  roc(test$label, pred_test) %>% coords()
+  pred_test <- ifelse(pred_test > 0.5, 1, 0)
+  pred_test <- as.factor(pred_test)
+  
+  return(pred_test);
+}
+```
+
+```{r}
+predict_LR <- LR(train_dtm, test_dtm)
+```
+
+### Random Forest
+
+```{r}
+RF <- function(train, test) {
+  names(train) <- make.names(names(train))
+  names(test) <- make.names(names(test))
+  k <- round(sqrt(ncol(train)-1))
+  # rf_model <- randomForest(label ~ ., data = train, ntree = 100, mtry = k, method = 'class')
+  
+  # save(rf_model, file = "./models/RF_model.RData")
+  
+  rf_model <- load("./models/RF_model.RData")
+  pred_test <- predict(rf_model, newdata = test, type = 'response')
+  
+  return(pred_test);
+}
+```
+
+```{r}
+predict_RF <- RF(train_dtm, test_dtm)
+```
+
+
+
+### Naive Bayes 
+
+Naive Bayes (NB) is a classifying algorithm which uses data about prior events to estimate the probability of future events. It is based on the Bayes theorem. Though it is a simple algorithm, it performs well in many text classification problems. Due to simplicity and effwctiveness, it is now the de facto standard for text classification problems. 
+
+```{r}
+NB <-  function(train, test){
+  nb_model <- naive_bayes(label ~ ., data = train)
+  # Model Summary
+  summary(nb_model)
+  
+  # save(nb_model, file = "./models/nb_model.RData")
+  # Predicted values
+  train$pred_nb <- predict(nb_model, type = 'class')
+  # Predicted Values for test set
+  test$pred_nb <- predict(nb_model, newdata = test)
+  return(test$pred_nb)
+}
+
+```
+
+
+```{r}
+predict_NB <- NB(train_dtm,test_dtm)
+```
+
+### Evaluation of the models using Test data
+
+```{r}
+calculateAccuracy <- function(test_labels, predict_labels) {
+  cf <- caret::confusionMatrix(test_labels, predict_labels)
+  acc <- cf[['overall']]['Accuracy']
+  return(acc);
+}
+```
+
+```{r}
+accuracy_LR <- calculateAccuracy(test_dtm$label, predict_LR)
+paste('Accuracy of LR: ', accuracy_LR)
+```
+
+```{r}
+accuracy_RF <- calculateAccuracy(test_dtm$label, predict_RF)
+paste('Accuracy of RF: ', accuracy_RF)
+```
+
+```{r}
+accuracy_nb <- calculateAccuracy(test_dtm$label, predict_NB)
+paste('Accuracy of NB: ', accuracy_nb)
+```
+

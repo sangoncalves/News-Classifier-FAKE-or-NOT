@@ -37,7 +37,6 @@ clean_data <- datapreprocessing(shuffled_data)
 
 generateDTM <- function(df) {
   corpus <- Corpus(VectorSource(df$text))
-  
   corpus <- tm_map(corpus, tolower)
   corpus <- tm_map(corpus, removePunctuation)
   corpus <- tm_map(corpus, removeNumbers)
@@ -47,13 +46,13 @@ generateDTM <- function(df) {
   corpus <- tm_map(corpus, content_transformer(lemmatize_strings))
   
   freq <- DocumentTermMatrix(corpus)
-  inspect(freq)
+  # inspect(freq)
   
   freq_clean <- removeSparseTerms(freq, 0.97)
-  inspect(freq_clean)
+  # inspect(freq_clean)
   
   freq_matrix <- as.matrix(freq_clean)
-  dim(freq_matrix)
+  # dim(freq_matrix)
   
   freq_matrix <- cbind(freq_matrix, label = shuffled_data$label)
   
@@ -73,17 +72,27 @@ spl = sample.split(DTM_df$label, 0.7)
 train_dtm = subset(DTM_df, spl == TRUE)
 test_dtm = subset(DTM_df, spl == FALSE)
 
+# --------------------Logistic Regression-----------------------
+
 LR <- function(train, test) {
-  log_model <- glm(label ~ ., data=train, family="binomial")
+  # Training LR model
+  # log_model <- glm(label ~ ., data=train, family="binomial")
   
+  # saving the trained model 
+  # save(log_model, file = "./models/LR_model.RData")
+  
+  log_model <- load("./models/LR_model.RData")
   pred_test <- predict(log_model, newdata = test, type = 'response')
   
+  # setting threshold for LR
   roc(test$label, pred_test) %>% coords()
   pred_test <- ifelse(pred_test > 0.5, 1, 0)
   pred_test <- as.factor(pred_test)
   
   return(pred_test);
 }
+
+
 
 predict_LR <- LR(train_dtm, test_dtm)
 
@@ -96,12 +105,17 @@ calculateAccuracy <- function(test_labels, predict_labels) {
 accuracy_LR <- calculateAccuracy(test_dtm$label, predict_LR)
 paste('Accuracy of LR: ', accuracy_LR)
 
+
+# --------------------Random Forest-----------------------
 RF <- function(train, test) {
   names(train) <- make.names(names(train))
   names(test) <- make.names(names(test))
   k <- round(sqrt(ncol(train)-1))
   rf_model <- randomForest(label ~ ., data = train, ntree = 100, mtry = k, method = 'class')
   
+  save(rf_model, file = "./models/RF_model.RData")
+  
+  load("./models/RF_model.RData")
   pred_test <- predict(rf_model, newdata = test, type = 'response')
   
   return(pred_test);
@@ -111,4 +125,21 @@ predict_RF <- RF(train_dtm, test_dtm)
 accuracy_RF <- calculateAccuracy(test_dtm$label, predict_RF)
 paste('Accuracy of RF: ', accuracy_RF)
 
+# --------------------NAive Bayes-----------------------
+NB <-  function(train, test){
+  nb_model <- naive_bayes(label ~ ., data = train)
+  # Model Summary
+  summary(nb_model)
+  
+  # save(nb_model, file = "./models/nb_model.RData")
+  # Predicted values
+  train$pred_nb <- predict(nb_model, type = 'class')
+  # Predicted Values for test set
+  test$pred_nb <- predict(nb_model, newdata = test)
+  return(test$pred_nb)
+}
 
+predict_NB <- NB(train_dtm,test_dtm)
+
+accuracy_nb <- calculateAccuracy(test_dtm$label, predict_NB)
+paste('Accuracy of NB: ', accuracy_nb)
