@@ -21,8 +21,8 @@ The data is composed by two labeled datasets, one containing "True" news and the
 
 | Model | Accuracy | 
 |---|---|
-|Logistic Regression| |
-|Random Forest | |
-| Naive Bayes | |
+|Logistic Regression|0.986 |
+|Random Forest | 0.998|
+| Naive Bayes |0.884 |
 
 ## Conclusion
