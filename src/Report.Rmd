@@ -1,0 +1,331 @@
+---
+title: "Fake New Classification"
+author: "Sander Martins Goncalves & Nisha Antony"
+date: "2/5/2021"
+output: html_document
+---
+```{r Libraries, include=FALSE}
+library(readr)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(tidyr)
+library(tm)
+library(textstem)
+library(tidytext)
+library(pROC)
+library(ROCR)
+library(randomForest)
+library(naivebayes)
+library(caret)
+library(caTools)
+```
+
+## **Introduction**
+
+### Project
+
+Trustful information is essential to the humanity since we act based on it, mainly in regard to aspects of life such as economy, politics and even safety. As flow of information increases each day and the production and sharing of contents becomes easier, the quality of information decreases. People sometimes gives priority to the impulse of sharing, more than to the verification. Moreover, more than just cases where a person shares not verified contents, the bigger problem arises when people has actual goal to distort information for personal gain, in what is called the manipulation of the masses. Having this context in mind that this project arises, in an attempt to test and compare what models perform better in recognizing if an information is fake or not.
+
+### Dataset
+
+The data used for this project was collected from real-world sources. The dataset we used in this project consists of two CSV files: "True.csv" for truthful news articles and "Fake.csv" fake news articles. The real news articles were obtained by crawling various news websites whereas, the fake news articles were collected from unreliable websites that were flagged by fact-checking organizations and Wikipedia. The dataset contains article title, text, subject, and the date published. Since we have the collection of fake and real news articles in separate csv files, we combine and shuffle the two. We assign appropriate labels for the news articles before combining them. The label of fake news articles are set as *1* and true news are set as *0*.     
+
+Now let's load our input dataset and create the shuffled data which is used for classification.
+
+```{r Loading data, include=FALSE}
+fake <- read.csv('Fake.csv', stringsAsFactors = F)
+fake$label <- 1
+
+true <- read.csv('True.csv', stringsAsFactors = F)
+true$label <- 0
+
+data <- rbind.data.frame(fake, true)
+set.seed(50)
+
+rows <- sample(nrow(data))
+shuffled_data <- data[rows, ]
+
+```
+> As you can see, the train dataset contains 5 columns: 
+
+
+* title - title of the news article
+* text - content of the news article
+* subject - name of the news category like: Political news, World news, Government news, etc
+* date - publication date
+* label - indicates type of article: real(0) or fake(1)
+
+## Models and Techniques Used
+
+There are many different algorithms we can choose from when doing text classification. The techniques we used for this project are Logistic Regression(LR), Random Forest(RF) and Naive Bayes (NB)
+
+## Implementation & Evaluation of Models
+In order to implement the algorithms, is necessary to change the format of the dataset in a way that is suitable to be the input of the models. The models used in this project, takes Document Term Matrix(DTM) as their input. So we have to preprocess the textual data into this format before the training process.
+
+> The implementation plan for each model is as follows:
+
+* Data Pre-processing
+* DTM generation 
+* Splitting dataset into Train and Test
+* Build & train the models
+* Prediction on Test data 
+* Evaluation of the models using Test data
+
+### Data Preprocessing
+
+Data Preprocessing is required before training the dataset. In this stage, we will remove the irrelevant attributes such as date and subject, and perform some basic transformations on the text and title such that all the textual data are stored under single attribute. This way, corpus can be created based on both the title and the content of news articles.
+
+```{r Preprocessing function, include=FALSE}
+datapreprocessing <- function(data) {
+  data$label <- as.factor(data$label)
+  data$subject <- as.factor(data$subject)
+  data <- data %>% select(title, text, label) %>% unite(col = text, title, text, sep = ' ') %>% mutate(ID = as.character(1:nrow(data)))
+  
+  return(data)
+}
+```
+
+```{r Clean data, include=FALSE}
+clean_data <- datapreprocessing(shuffled_data)
+```
+
+### DTM generation
+
+A text corpus is a large and unstructured set of texts used to do statistical analysis and hypothesis testing. This part is responsible for creating a clean Corpus from our input dataset so that we can analyse it further. After the creation of corpus, we will remove all unnecessary words and characters in order to improve the learning of the models. We then create a Document Term Matrix(DTM) from the refined corpus which will then be used to train and test the models. 
+
+The Document Term Matrix (DTM) lists all occurrences of words in the corpus, by document. In the DTM, the documents are represented by rows and the terms (or words) by columns. If a word occurs in a particular document, then the matrix entry for corresponding to that row and column is 1, else it is 0 (multiple occurrences within a document are recorded – that is, if a word occurs twice in a document, it is recorded as “2” in the relevant matrix entry). Then we will remove the terms which don't appear too often in our data. We will remove any element that doesn't appear in at least 3% of the entries (or documents). From the DTM, we are basically removing those columns whose entries are 1 in least number of documents.
+
+```{r Corpus function, include=FALSE}
+generateDTM <- function(df) {
+  corpus <- Corpus(VectorSource(df$text))
+  corpus <- tm_map(corpus, tolower)
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, removeWords, stopwords('en'))
+  corpus <- tm_map(corpus, stripWhitespace)
+  corpus <- tm_map(corpus, content_transformer(str_remove_all), "[[:punct:]]")
+  corpus <- tm_map(corpus, content_transformer(lemmatize_strings))
+  
+  freq <- DocumentTermMatrix(corpus)
+  freq_clean <- removeSparseTerms(freq, 0.97)
+  
+  freq_matrix <- as.matrix(freq_clean)
+  
+  freq_matrix <- cbind(freq_matrix, label = shuffled_data$label)
+  
+  summary(freq_matrix[, 'label'])
+  
+  freq_df <- as.data.frame(freq_matrix)
+  freq_df$label <- ifelse(freq_df$label == 1, 0, 1)
+  freq_df$label <- as.factor(freq_df$label)
+  
+  return(freq_df);
+}
+```
+
+```{r DTM, include=FALSE}
+DTM_df <- generateDTM(clean_data)
+```
+
+### Splitting Data
+At this stage the data is ready to be subdivided into *training* and *test* and ready to be used as *input*.
+
+```{r Splitting data, include=FALSE}
+set.seed(50)
+spl = sample.split(DTM_df$label, 0.7)
+train_dtm = subset(DTM_df, spl == TRUE)
+test_dtm = subset(DTM_df, spl == FALSE)
+```
+
+## Models
+
+### Logistic Regression
+
+Logistic regression is a statistical machine learning algorithm that classifies the data by considering outcome variables on extreme ends and this algorithm is providing a discriminatory line between classes. Compared to another simple model, linear regression, which requires hard threshold in classification, logistic regression can overcome threshold values for a large dataset. Logistic regression produces a logistic curve, which is limited to values between 0 to 1, by adding sigmoid function in the end.
+
+```{r LR model function, echo=TRUE, warning=FALSE}
+LR <- function(train, test) {
+  # Training LR model
+  # log_model <- glm(label ~ ., data=train, family="binomial")
+  
+  # saving the trained model 
+  # saveRDS(log_model, file = "./models/lrmodel.rds")
+  
+  log_model <- readRDS("./models/lrmodel.rds")
+  pred_test <- predict(log_model, newdata = test, type = 'response')
+  
+  # setting threshold for LR
+  roc(test$label, pred_test) %>% coords()
+  pred_test <- ifelse(pred_test > 0.5, 1, 0)
+  pred_test <- as.factor(pred_test)
+  
+  return(pred_test);
+}
+```
+
+```{r LR model, echo=FALSE, warning=FALSE}
+predict_LR <- LR(train_dtm, test_dtm)
+```
+
+### Random Forest
+
+Random Forest is very useful machine learning algorithm which works by creating multiple decision trees. The output of those decision trees are then combined to compute the final output. Decision tree is a classification model which works on the concept of information gain at every node. For all the data points, decision tree will try to classify data points at each of the nodes and check for information gain at each node. It will then classify at the node where information gain is maximum. It will follow this process subsequently until all the nodes are exhausted or there is no further information gain. Decision trees have low predicting power. 
+
+Random Forest works on same principle as that of decision trees. But it takes sample data points and variables from each trees rather than selecting all. By this manner, it removes the bias that a decision tree might bring into the system and thereby improving the predictability.
+
+In this project, we have fine tuned the model by changing number of trees(ntree) and the number of variables randomly sampled at each stage(mtry). We set a high *ntree* value so that all the input rows are gets predicted. The default *mtry* value is normally the square root of the number of predictor variables. In our data, since the last column is the label, we reduce it from the number of predictors and set the new *mtry* value.
+
+
+```{r echo=TRUE, warning=FALSE}
+RF <- function(train, test) {
+  names(train) <- make.names(names(train)) # removing possibility of error due to unrecognized names
+  names(test) <- make.names(names(test)) # removing possibility of error due to unrecognized names
+  
+  k <- round(sqrt(ncol(train)-1))
+  # rf_model <- randomForest(label ~ ., data = train, ntree = 100, mtry = k, method = 'class')
+  
+  # saveRDS(rf_model, file = "./models/RF_model.rds")
+  
+  rf_model <- readRDS("./models/RF_model.rds")
+  pred_test <- predict(rf_model, newdata = test, type = 'response')
+  
+  return(pred_test);
+}
+```
+
+```{r echo=FALSE, warning=FALSE}
+predict_RF <- RF(train_dtm, test_dtm)
+```
+
+### Naive Bayes 
+
+Naive Bayes (NB) is a classifying algorithm which uses data about prior events to estimate the probability of future events. It is based on the Bayes theorem. Though it is a simple algorithm, it performs well in many text classification problems. Due to simplicity and effectiveness, it is now the de facto standard for text classification problems. 
+
+### How it works?
+*1- Prior Probability*
+
+It start by defining the prior probability, which is the initial probability of belonging to one category or another. If this value is not present in the function, the default value will be the proportion of data in each category.
+
+*2- Probability of the sentence (multiplication of each word) belonging to each group*
+
+For each sentence that is being analysed (input), it takes the frequency for each word by category and calculate the probability of the sentence belonging to each category.
+
+*3- Choosing the final category*
+
+For each sentence(input), the final category to be assigned (output) will be the one with the highest score of the product of the Prior and the probability of the sentence belonging to each category (*True* or *Fake*, in our case).
+
+```{r include=FALSE}
+calculateAccuracy <- function(test_labels, predict_labels) {
+  cf <- caret::confusionMatrix(test_labels, predict_labels)
+  acc <- cf[['overall']]['Accuracy']
+  return(acc);
+}
+```
+
+```{r NB Function, warning=FALSE, include=FALSE}
+NB <-  function(train, test, lp, prior){
+  acc_nb <- list()
+  par_nb <- list()
+  
+  df_parameters <- data.frame(Laplace = as.double(),
+                 Prior = as.double(),
+                 Accuracy = as.double())
+  for(lp_value in lp){
+    nb_model <- naive_bayes(label ~ ., data = train, laplace = lp_value)
+    test$pred_nb <- predict(nb_model, newdata = test) # Predicted Values for test set
+    accuracy_nb <- calculateAccuracy(test$label, test$pred_nb)
+    df_parameters <- rbind(df_parameters, list(Laplace = lp_value, Prior = 0.523, Accuracy = accuracy_nb))
+  }
+  for(lp_value in lp){
+    for (prior_value in prior){
+      nb_model <- naive_bayes(label ~ ., data = train, prior = c(prior_value,1-prior_value), laplace = lp_value)
+      test$pred_nb <- predict(nb_model, newdata = test) # Predicted Values for test set
+      accuracy_nb <- calculateAccuracy(test$label, test$pred_nb)
+      df_parameters <- rbind(df_parameters, list(Laplace = lp_value, Prior = prior_value, Accuracy = accuracy_nb))
+    }
+  }
+
+  max_index <- which.max(df_parameters$Accuracy) 
+  if (df_parameters$Prior[max_index]!=0){
+  nb_model_choosen <- naive_bayes(label ~ ., data = train, laplace = df_parameters$Laplace[max_index],prior = c(df_parameters$Prior[max_index], 1-df_parameters$Prior[max_index]))
+  } else {
+    nb_model_choosen <- naive_bayes(label ~ ., data = train, laplace = df_parameters$Laplace[max_index])
+  }
+  # Model Summary
+  summary(nb_model_choosen)
+  
+  # save(nb_model, file = "./models/nb_model.RData")
+  
+  # Predicted Values for test set
+  test$pred_nb <- predict(nb_model_choosen, newdata = test)
+  return(test$pred_nb)
+}
+
+```
+
+In order to choose the best set of parameters for the Naive Bayes model, we are going to consider some options for *Laplace* and *Prior*. The setting with the highest score will be chosen for our model.  
+
+```{r echo=FALSE, warning=FALSE}
+#testing some values
+lp <- c(0,1,50,100)
+prior <- c(0.2,0.4,0.5,0.7)
+
+predict_NB <- NB(train_dtm,test_dtm,lp = lp, prior = prior)
+```
+
+Since we removed the least frequent words from our DTM, the parameter Laplace does not have any effect on our Naive Bayes model. Laplace is used in cases where we have words that are not present in some classes. In such cases, we set a value to Laplace as an attempt to "smooth" the probabilities and ensure that it does not go to zero for the class that does not have this word.
+The choice for the parameters was done by testing different values and analyzing which one got the highest accuracy.
+
+## Evaluation of the models using Test data
+
+In order to evaluate the models we can use the confusion matrix. This matrix is composed by *True positives* (TP), *True negatives* (TN), *False positives* (FP) and *False negatives* (FN).
+Also, this matrix compares the predicted value with actual value.
+
+Predicted:
+Positive class = *True positives* (TP) + *False negatives* (FN)
+Negative class =  *False positives* (FP) + *True negatives* (TN)
+
+Actual value:
+Positive class = *True positives* (TP) +  *False positives* (FP)
+Negative class = *False negatives* (FN) + *True negatives* (TN)
+
+We use these values in order to calculate *Accuracy*, *Sensitivity*, *Precision* and *Specificity*.
+
+In summary these terms can be understood as:
+
+Accuracy - How close the predictions were from the real value
+$Accuracy = \frac{\sum{Correct \; predictions}}{Total \; observations}$
+
+Sensitivity (recall) - How often a model will be predicting as positive class when the real value is positive class
+$Recall = \frac{TP}{TP+FN}$
+
+Precision - How often a model is correct when predicting a positive  class.
+$Precision = \frac{TP}{TP+FP}$
+
+Specificity - How often a model will be predicting as negative class when the real value is negative class
+$Specificity = \frac{TN}{TN+FN}$
+
+
+```{r}
+caret::confusionMatrix(test_dtm$label, predict_LR)
+accuracy_LR <- calculateAccuracy(test_dtm$label, predict_LR)
+paste('Accuracy of LR: ', accuracy_LR)
+```
+
+```{r}
+caret::confusionMatrix(test_dtm$label, predict_RF)
+accuracy_RF <- calculateAccuracy(test_dtm$label, predict_RF)
+paste('Accuracy of RF: ', accuracy_RF)
+```
+
+```{r echo=FALSE}
+caret::confusionMatrix(test_dtm$label, predict_NB)
+accuracy_NB <- calculateAccuracy(test_dtm$label, predict_NB)
+paste('Accuracy of NB: ', accuracy_NB)
+```
+
+## Conclusion
+In our case, the most important metric parameter that we can analyze is accuracy. The reason is that, in our case, a wrong output does not represents loss or damage to any entity. For example, in a case where a model classifies as edible or poisonous fungus, the precision would be the most important metric, since we would prefer to avoid risk. Or by the other hand, in a case of classification of the extracted mineral as rare or not, recall would be the most important, since we would prefer to minimize the loss. 
+Analyzing the confusion matrix we can perceive that the model with highest accuracy is Random Forest (*~99.8%*) and the model with the lowest accuracy is Naive Bayes (*~88%*). The Random Forest (RF) classifiers are suitable for dealing with the high dimensional noisy data in text classification. The RF model comprises a set of decision trees each of which is trained using random subsets of features. Given the high dimension of the input and the higher number of decision used for training, we have a good accuracy rate for this model. Some of the reason for the NB to have the lowest accuracy can be due to its assumption of independence among the words. This means that it takes not in consideration the order of the words, but treats the input as a "bag of words" and calculate the probabilities (hence the name naive).
+
