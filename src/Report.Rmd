@@ -34,10 +34,10 @@ The data used for this project was collected from real-world sources. The datase
 Now let's load our input dataset and create the shuffled data which is used for classification.
 
 ```{r Loading data, include=FALSE}
-fake <- read.csv('Fake.csv', stringsAsFactors = F)
+fake <- read.csv('../dataset/Fake.csv', stringsAsFactors = F)
 fake$label <- 1
 
-true <- read.csv('True.csv', stringsAsFactors = F)
+true <- read.csv('../dataset/True.csv', stringsAsFactors = F)
 true$label <- 0
 
 data <- rbind.data.frame(fake, true)
