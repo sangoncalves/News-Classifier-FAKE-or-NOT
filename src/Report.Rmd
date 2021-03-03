@@ -1,7 +1,9 @@
 ---
-title: "Fake New Classification"
-author: "Sander Martins Goncalves & Nisha Antony"
-date: "2/5/2021"
+title: "Text classifier project - Fake news or True?"
+author:
+  - "Nisha Antony"
+  - "Sander Martins"
+date: "01/02/2021"
 output: html_document
 ---
 ```{r Libraries, include=FALSE}
@@ -327,5 +329,5 @@ paste('Accuracy of NB: ', accuracy_NB)
 
 ## Conclusion
 In our case, the most important metric parameter that we can analyze is accuracy. The reason is that, in our case, a wrong output does not represents loss or damage to any entity. For example, in a case where a model classifies as edible or poisonous fungus, the precision would be the most important metric, since we would prefer to avoid risk. Or by the other hand, in a case of classification of the extracted mineral as rare or not, recall would be the most important, since we would prefer to minimize the loss. 
-Analyzing the confusion matrix we can perceive that the model with highest accuracy is Random Forest (*99.8%*) and the model with the lowest accuracy is Naive Bayes (*88%*). The Random Forest (RF) classifiers are suitable for dealing with the high dimensional noisy data in text classification. The RF model comprises a set of decision trees each of which is trained using random subsets of features. Given the high dimension of the input and the higher number of decision used for training, we have a good accuracy rate for this model. Some of the reason for the NB to have the lowest accuracy can be due to its assumption of independence among the words. This means that it takes not in consideration the order of the words, but treats the input as a "bag of words" and calculate the probabilities (hence the name naive).
+Analyzing the confusion matrix we can perceive that the model with highest accuracy is Random Forest (*~99.8%*) and the model with the lowest accuracy is Naive Bayes (*~88%*). The Random Forest (RF) classifiers are suitable for dealing with the high dimensional noisy data in text classification. The RF model comprises a set of decision trees each of which is trained using random subsets of features. Given the high dimension of the input and the higher number of decision used for training, we have a good accuracy rate for this model. Some of the reason for the NB to have the lowest accuracy can be due to its assumption of independence among the words. This means that it takes not in consideration the order of the words, but treats the input as a "bag of words" and calculate the probabilities (hence the name naive).
 
