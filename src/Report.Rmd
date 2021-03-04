@@ -149,12 +149,12 @@ Logistic regression is a statistical machine learning algorithm that classifies 
 ```{r LR model function, echo=TRUE, warning=FALSE}
 LR <- function(train, test) {
   # Training LR model
-  # log_model <- glm(label ~ ., data=train, family="binomial")
+  log_model <- glm(label ~ ., data=train, family="binomial")
   
   # saving the trained model 
   # saveRDS(log_model, file = "./models/lrmodel.rds")
   
-  log_model <- readRDS("./models/lrmodel.rds")
+  # log_model <- readRDS("./models/lrmodel.rds")
   pred_test <- predict(log_model, newdata = test, type = 'response')
   
   # setting threshold for LR
@@ -185,11 +185,11 @@ RF <- function(train, test) {
   names(test) <- make.names(names(test)) # removing possibility of error due to unrecognized names
   
   k <- round(sqrt(ncol(train)-1))
-  # rf_model <- randomForest(label ~ ., data = train, ntree = 100, mtry = k, method = 'class')
+  rf_model <- randomForest(label ~ ., data = train, ntree = 100, mtry = k, method = 'class')
   
   # saveRDS(rf_model, file = "./models/RF_model.rds")
   
-  rf_model <- readRDS("./models/RF_model.rds")
+  # rf_model <- readRDS("./models/RF_model.rds")
   pred_test <- predict(rf_model, newdata = test, type = 'response')
   
   return(pred_test);
